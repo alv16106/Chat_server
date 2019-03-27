@@ -2,14 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
-#include "cJSON.h"
+#include <nlohmann/json.hpp>
+#include <stdlib.h>
+#include<iostream> 
+#include<string> // for string class 
 #include "server.h"
+
+using namespace std;
+// for convenience
+using json = nlohmann::json;
 
 #define MAX_CONNECTIONS 10
 #define MESSAGE_BUFFER 1024
@@ -67,6 +73,7 @@ int main(int argc, char**argv) {
 		/* Reduce CPU usage */
     sleep(1);
   }
+	return 0;
 }
 
 void handleError(char *ErrorMessage){
@@ -74,16 +81,45 @@ void handleError(char *ErrorMessage){
   exit(EXIT_FAILURE);
 }
 
+string getErrorResponse(string message){
+	json response;
+	response["code"] = 500;
+	response["data"]["error_message"] = message;
+	return response.dump();
+}
+
+// Thread que maneja las peticiones de UN usuario
 void *handleSession(void *data){
+	// De que tamaño puede mandar las cosas ese usuario
   char buff[MESSAGE_BUFFER];
 	int readBuff;
-
+	string username;
+	// Ya que entro se aumenta en contador de uids
 	id++;
 	client *cli = (client *)data;
+	// Vemos si lo primero que hace un cliente es un handshake
   printf("Esperando Handshake...\n");
   readBuff = read(cli->fd, buff, MESSAGE_BUFFER);
   printf("Valindado... %s\n", buff);
-  strcpy(cli->username, buff);
+	auto j = json::parse(buff);
+	cout << j.dump(4) << endl;
+	json response;
+	if (j.count("data") && j["code"] == 0) {
+		printf("Estructura de peticion valida...\n");
+		json payload = j["data"];
+		if (payload.count("username") && payload["username"].is_string()) {
+			username = payload["username"];
+			printf("Bienvenido %s\n", username.c_str());
+		}
+	} else {
+		string msg = getErrorResponse("Invalid handshake");
+		write(cli->fd, msg.c_str(), msg.length());
+		close(cli->fd);
+		return NULL;
+	}
+	
+	
+  strcpy(cli->username, username.c_str());
   printf("El username ahora es: %s", cli->username);
 }
 
