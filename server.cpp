@@ -64,6 +64,7 @@ int main(int argc, char**argv) {
     client *cli = (client *)malloc(sizeof(client));
 		cli->addr = cli_addr;
 		cli->fd = connfd;
+		cli->status = 0;
 		cli->id = id++;
 		sprintf(cli->username, "%d", cli->id);
 
@@ -99,17 +100,20 @@ void *handleSession(void *data){
 	client *cli = (client *)data;
 	// Vemos si lo primero que hace un cliente es un handshake
   printf("Esperando Handshake...\n");
+	// Se lee lo primero que mando el cliente
   readBuff = read(cli->fd, buff, MESSAGE_BUFFER);
   printf("Valindado... %s\n", buff);
 	auto j = json::parse(buff);
 	cout << j.dump(4) << endl;
-	json response;
+	json response, request;
+	// Tiene la forma que queremos? Si si, responder el ok, si no responder con un error
 	if (j.count("data") && j["code"] == 0) {
 		printf("Estructura de peticion valida...\n");
 		json payload = j["data"];
 		if (payload.count("username") && payload["username"].is_string()) {
 			username = payload["username"];
 			printf("Bienvenido %s\n", username.c_str());
+			strcpy(cli->username, username.c_str());
 		}
 	} else {
 		string msg = getErrorResponse("Invalid handshake");
@@ -117,9 +121,39 @@ void *handleSession(void *data){
 		close(cli->fd);
 		return NULL;
 	}
-	
-	
-  strcpy(cli->username, username.c_str());
-  printf("El username ahora es: %s", cli->username);
+	response["code"] = 200;
+	response["data"]["user"]["id"] = cli->id;
+	response["data"]["user"]["username"] = cli->username;
+	response["data"]["user"]["status"] = cli->status;
+	write(cli->fd, response.dump().c_str(), response.dump().length());
+	memset(buff, 0, MESSAGE_BUFFER);
+	while((readBuff = read(cli->fd, buff, sizeof(buff)-1)) > 0){
+		request = json::parse(buff);
+		if (!j.count("code") || !j.count("data")) {
+			string errorResponse = getErrorResponse("Request mal estructurada");
+			write(cli->fd, errorResponse.c_str(), errorResponse.length());
+			continue;
+		}
+		int code = j["code"];
+		switch (code) {
+			case 1:
+				/* sendMessage */
+				break;
+			case 3:
+				/* Get user */
+				break;
+			case 4:
+				/* Change status */
+				break;
+			default:
+				/* No recognized code */
+				string errorResponse = getErrorResponse("Codigo del request no reconocido");
+				write(cli->fd, errorResponse.c_str(), errorResponse.length());
+				break;
+		}
+		
+		memset(buff, 0, MESSAGE_BUFFER);
+	}
+	return NULL;
 }
 

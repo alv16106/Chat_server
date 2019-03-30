@@ -20,8 +20,8 @@ int main(int argc, char const *argv[])
   json sub_j = j["answer"];
   int count = j["answer"].count("everything");
   string nombre = j["name"];
-  if (j.count("s")) {
-    printf("NO");
+  if (!j.count("ye") && j.count("happy")) {
+    printf("Si");
   }else
   {
     printf("si");

@@ -2,6 +2,8 @@
 #include <sys/socket.h> //For Sockets
 #include <stdlib.h>
 #include <netinet/in.h> //For the AF_INET (Address Family)
+#include <string.h>
+#include <arpa/inet.h>
 
 struct sockaddr_in serv; //This is our main socket variable.
 int fd; //This is the socket file descriptor that will be used to identify the socket
@@ -23,6 +25,22 @@ int main(int argc, char const *argv[])
     printf("Enter a message: ");
     fgets(message, 100, stdin);
     send(fd, message, strlen(message), 0);
+    int socket_fd, response;
+    char message[1024];
+        // Print received message
+    while(1) {
+      response = recvfrom(fd, message, 1024, 0, NULL, NULL);
+      if (response == -1) {
+        printf("error");
+        break;
+      } else if (response == 0) {
+        printf("\nPeer disconnected\n");
+        break;
+      } else {
+        printf("\nServer> %s", message);
+        fflush(stdout); // Make sure "User>" gets printed
+      }
+    }
     //An extra breaking condition can be added here (to terminate the while loop)
   }
   return 0;
