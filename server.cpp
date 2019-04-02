@@ -212,7 +212,8 @@ void *handleSession(void *data){
 			// Va a enviar un mensaje, si viene vacio el arreglo se le envia a todos, de lo contrario solo a las personas en el arreglo
 			case 1:{
 				// Verificamos que en efecto la data tenga la forma deseada
-				if (!data.count("message") || !request.count("to")) {
+				cout << data.dump()<< endl;
+				if (!data.count("message") || !data.count("to")) {
 					string errorResponse = getErrorResponse("Request de mensaje mal estructurada");
 					write(cli->fd, errorResponse.c_str(), errorResponse.length());
 					break;
@@ -237,6 +238,7 @@ void *handleSession(void *data){
 					write(cli->fd, errorResponse.c_str(), errorResponse.length());
 					break;
 				}
+				
 				vector<int> users = data["user"];
 				if (users.empty()) {
 					string ok = getAllUsers();
