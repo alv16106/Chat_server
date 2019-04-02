@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include<iostream> 
 #include<string> // for string class 
-#include "server.h"
+#include "server.hpp"
 
 using namespace std;
 // for convenience
@@ -22,6 +22,7 @@ using json = nlohmann::json;
 
 client connections[MAX_CONNECTIONS];
 int clientNum, id = 0;
+vector<client> clients;
 
 int main(int argc, char**argv) {
   int listenfd = 0, connfd = 0;
@@ -61,12 +62,12 @@ int main(int argc, char**argv) {
 		printf("IP Adress: %d\n", cli_addr.sin_addr.s_addr);
 		printf("Port: %d\n", cli_addr.sin_port);
     printf("ID: %d\n", connfd);
-    client *cli = (client *)malloc(sizeof(client));
+    client *cli = new client;
 		cli->addr = cli_addr;
 		cli->fd = connfd;
 		cli->status = 0;
 		cli->id = id++;
-		sprintf(cli->username, "%d", cli->id);
+		cli->username = to_string(cli->id);
 
 		/* Fork thread */
 		pthread_create(&tid, NULL, &handleSession, (void*)cli);
@@ -82,10 +83,78 @@ void handleError(char *ErrorMessage){
   exit(EXIT_FAILURE);
 }
 
+void sendPrivateMessage(string message, string from, vector<int> to){
+	json response;
+	response["code"] = 201;
+	response["data"]["from"] = from;
+	response["data"]["message"] = message;
+	string msg = response.dump();
+	for (auto it = to.begin(); it != to.end(); it++){
+		for(auto user: clients){
+			if (user.id == *it) {
+				cout << "mensajin para ti bb" << endl;
+				write(user.fd, msg.c_str(), msg.length());
+			}
+		}
+	} 
+}
+
+void sendDiffusion(string message, string from) {
+	json response;
+	response["code"] = 201;
+	response["data"]["from"] = from;
+	response["data"]["message"] = message;
+	string msg = response.dump();
+	for(auto user: clients){
+		write(user.fd, msg.c_str(), msg.length());
+	}
+}
+
+string getUsers(vector<int> userIds){
+	json response;
+	vector<json> users;
+	response["code"] = 203;
+	for (auto it = userIds.begin(); it != userIds.end(); it++){
+		for(auto user: clients){
+			if (user.id == *it) {
+				json us;
+				us["id"] = user.id;
+				us["username"] = user.username;
+				us["status"] = user.status;
+				users.push_back(us);
+			}
+		}
+	}
+	response["data"]["users"] = users;
+	return response.dump();
+}
+
+string getAllUsers(){
+	json response;
+	vector<json> users;
+	response["code"] = 203;
+	for(auto user: clients){
+		json us;
+		us["id"] = user.id;
+		us["username"] = user.username;
+		us["status"] = user.status;
+		users.push_back(us);
+	}
+	response["data"]["users"] = users;
+	return response.dump();
+}
+
 string getErrorResponse(string message){
 	json response;
 	response["code"] = 500;
 	response["data"]["error_message"] = message;
+	return response.dump();
+}
+
+string getBasicOk(string status){
+	json response;
+	response["code"] = 200;
+	response["data"]["status"] = status;
 	return response.dump();
 }
 
@@ -113,7 +182,7 @@ void *handleSession(void *data){
 		if (payload.count("username") && payload["username"].is_string()) {
 			username = payload["username"];
 			printf("Bienvenido %s\n", username.c_str());
-			strcpy(cli->username, username.c_str());
+			cli->username = username;
 		}
 	} else {
 		string msg = getErrorResponse("Invalid handshake");
@@ -126,27 +195,64 @@ void *handleSession(void *data){
 	response["data"]["user"]["username"] = cli->username;
 	response["data"]["user"]["status"] = cli->status;
 	write(cli->fd, response.dump().c_str(), response.dump().length());
+	clients.push_back(*cli);
 	memset(buff, 0, MESSAGE_BUFFER);
 	while((readBuff = read(cli->fd, buff, sizeof(buff)-1)) > 0){
 		request = json::parse(buff);
-		if (!j.count("code") || !j.count("data")) {
+		cout << request.dump() << endl;
+		if (!request.count("code") || !request.count("data")) {
 			string errorResponse = getErrorResponse("Request mal estructurada");
+			printf("lmao esto no es un json\n");
 			write(cli->fd, errorResponse.c_str(), errorResponse.length());
 			continue;
 		}
-		int code = j["code"];
+		int code = request["code"];
+		json data = request["data"];
 		switch (code) {
-			case 1:
-				/* sendMessage */
+			// Va a enviar un mensaje, si viene vacio el arreglo se le envia a todos, de lo contrario solo a las personas en el arreglo
+			case 1:{
+				// Verificamos que en efecto la data tenga la forma deseada
+				if (!data.count("message") || !request.count("to")) {
+					string errorResponse = getErrorResponse("Request de mensaje mal estructurada");
+					write(cli->fd, errorResponse.c_str(), errorResponse.length());
+					break;
+				}
+				string ok = getBasicOk("ok");
+				vector<int> to = data["to"];
+				string message = data["message"];
+				if (to.empty()) {
+					sendDiffusion(message, cli->username);
+					write(cli->fd, ok.c_str(), ok.length());
+					break;
+				}
+				write(cli->fd, ok.c_str(), ok.length());
+				sendPrivateMessage(message, cli->username, to);
 				break;
-			case 3:
-				/* Get user */
+			}
+			/* Get user */
+			case 3:{
+				// Verificamos que en efecto la data tenga la forma deseada
+				if (!data.count("user")) {
+					string errorResponse = getErrorResponse("Request de getUser mal estructurada");
+					write(cli->fd, errorResponse.c_str(), errorResponse.length());
+					break;
+				}
+				vector<int> users = data["user"];
+				if (users.empty()) {
+					string ok = getAllUsers();
+					write(cli->fd, ok.c_str(), ok.length());
+					break;
+				}
+				string ok = getUsers(users);
+				write(cli->fd, ok.c_str(), ok.length());
 				break;
+			}
 			case 4:
 				/* Change status */
 				break;
 			default:
 				/* No recognized code */
+				printf("Error en una request realizada por el cliente %s\n", cli->username);
 				string errorResponse = getErrorResponse("Codigo del request no reconocido");
 				write(cli->fd, errorResponse.c_str(), errorResponse.length());
 				break;

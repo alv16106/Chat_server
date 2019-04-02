@@ -27,8 +27,11 @@ int main(int argc, char const *argv[])
     send(fd, message, strlen(message), 0);
     int socket_fd, response;
     char message[1024];
+    response = recvfrom(fd, message, 1024, 0, NULL, NULL);
+    printf("\nServer> %s\n", message);
+    fflush(stdout);
         // Print received message
-    while(1) {
+    /* while(1) {
       response = recvfrom(fd, message, 1024, 0, NULL, NULL);
       if (response == -1) {
         printf("error");
@@ -40,7 +43,7 @@ int main(int argc, char const *argv[])
         printf("\nServer> %s", message);
         fflush(stdout); // Make sure "User>" gets printed
       }
-    }
+    } */
     //An extra breaking condition can be added here (to terminate the while loop)
   }
   return 0;

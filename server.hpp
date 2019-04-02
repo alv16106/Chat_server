@@ -1,9 +1,10 @@
 #include <netinet/in.h>
+#include<string>
 
 
 typedef struct {
   int id;
-  char username[25];
+  std::string username;
   int status;
   int fd;
   struct sockaddr_in addr;
@@ -12,8 +13,8 @@ typedef struct {
 void handleError(char* message);
 void *ping(void *data);
 void *handleSession(void *data);
-char *sendMessage(char *message, int from, int to);
-char *sendDiffusion(char *message, int id);
+void sendPrivateMessage(std::string message, std::string from, int to);
+void sendDiffusion(std::string message, std::string from);
 char *okHandshake(struct sockaddr_in conn);
 void handleError(char *ErrorMessage);
 void addToQueue(client *cl);
