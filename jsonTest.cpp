@@ -24,12 +24,17 @@ int main(int argc, char const *argv[])
   json prueba;
   prueba["Code"] = 2;
   prueba["Jsons"] = k;
-  cout << prueba.dump(4) << endl;
+  vector<int *> juan;
+  int a = 2;
+  int b = 5;
+  juan.push_back(&a);
+  juan.push_back(&b);
+  a = a+5;
+  cout << *juan[0] << endl;
   json sub_j = j["answer"];
   int count = j["answer"].count("everything");
   string nombre = j["name"];
   vector<string> g1 = j3["happy"];
-  cout << g1[0] << endl;
   if (!j.count("ye") && j.count("happy")) {
     printf("Si");
   }else
