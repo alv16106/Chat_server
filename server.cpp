@@ -251,7 +251,7 @@ void *handleSession(void *data){
 		cout << request.dump() << endl;
 		if (!request.count("code") || !request.count("data")) {
 			string errorResponse = getErrorResponse("Request mal estructurada");
-			printf("lmao esto no es un json\n");
+			printf("Se ha recibido una request mal estructurada\n");
 			write(cli->fd, errorResponse.c_str(), errorResponse.length());
 			continue;
 		}
@@ -317,6 +317,7 @@ void *handleSession(void *data){
 				cout << "Se ha desconectado el usuario: " + cli->username << endl;
 				close(cli->fd);
 				removeFromQueue(cli->id);
+				return NULL;
 				break;
 			}
 			default:
@@ -330,7 +331,8 @@ void *handleSession(void *data){
 		memset(buff, 0, MESSAGE_BUFFER);
 	}
 	cout << "Un usuario se ha desconectado de manera inesperada: " + cli->username << endl;
-	
+	close(cli->fd);
+	removeFromQueue(cli->id);
 	return NULL;
 }
 
