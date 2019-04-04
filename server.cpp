@@ -273,10 +273,8 @@ void *handleSession(void *data){
 				string message = data["message"];
 				if (to.empty()) {
 					sendDiffusion(message, cli->username);
-					write(cli->fd, ok.c_str(), ok.length());
 					break;
 				}
-				write(cli->fd, ok.c_str(), ok.length());
 				sendPrivateMessage(message, cli->username, to);
 				break;
 			}
